@@ -1,0 +1,4 @@
+requests>=2.31
+# Real Chrome TLS fingerprint — DB's Akamai edge blocks plain requests
+# from many (esp. datacenter) IPs. Strongly recommended.
+curl_cffi>=0.7

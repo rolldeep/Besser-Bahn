@@ -1,0 +1,34 @@
+name: Ticket tool
+
+on:
+  pull_request:
+    paths:
+      - "ticket-tool/**"
+      - ".github/workflows/ticket-tool.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "ticket-tool/**"
+      - ".github/workflows/ticket-tool.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      # Offline unit tests: the /mob backend is faked, so no network flakiness.
+      - name: Install deps
+        run: pip install --quiet requests
+
+      - name: Unit tests
+        working-directory: ticket-tool
+        run: python -m unittest discover -s tests -v
