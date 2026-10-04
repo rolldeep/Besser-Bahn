@@ -20,7 +20,33 @@ last-minute fares:
 It talks to the same DB Navigator backend (`app.services-bahn.de/mob`) as the
 Besser-Bahn app. The bahn.de website API is Akamai-blocked for scripts.
 
-## Install
+## Quick start (uv)
+
+With [uv](https://docs.astral.sh/uv/) you don't install anything by hand. The
+first run creates `ticket-tool/.venv` with Python and the deps from `uv.lock`:
+
+```bash
+git clone https://github.com/rolldeep/Besser-Bahn && cd Besser-Bahn/ticket-tool
+uv run bbt serve                                  # web UI → http://127.0.0.1:8737
+uv run bbt hunt Hildesheim "Berlin Hbf" --date 2026-10-07 --days 2 --top 10 --bahncard bc25
+```
+
+`./bbt …` does the same (it uses `uv run` whenever uv is on your PATH). To get
+a global `bbt` command, which is also the best setup for cron:
+
+```bash
+uv tool install ./ticket-tool        # from the repo root; `uv tool upgrade bbtickets` later
+bbt search Hildesheim Berlin --date 2026-10-08 --time 07:00
+```
+
+Don't use a one-off `uvx` run for `bbt cron install`: uvx's environment is
+temporary, so the cron line would stop working once uv prunes its cache. The
+tool warns you about this.
+
+Run it on your own machine. DB blocks many datacenter and cloud IPs, so a
+home connection works best.
+
+### Without uv
 
 ```bash
 cd ticket-tool
@@ -126,6 +152,6 @@ searches from *now* to the window end, so past departures are ignored.
 ## Development
 
 ```bash
-python3 -m unittest discover -s tests     # offline, no network needed
-cd ../api-tests && python3 healthcheck.py # live: includes the bbt parser check
+uv run python -m unittest discover -s tests       # offline, no network needed
+uv run python ../api-tests/healthcheck.py         # live: includes the bbt parser check
 ```

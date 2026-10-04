@@ -185,8 +185,9 @@ a notification (ntfy/Telegram) as soon as a matching ticket becomes bookable
 or cheaper — see [`ticket-tool/README.md`](ticket-tool/README.md).
 
 ```bash
-cd ticket-tool && pip install -r requirements.txt
+cd ticket-tool                    # no uv? pip install -r requirements.txt
 ./bbt watch add Berlin München --date 2026-10-10 --max-price 30 && ./bbt cron install
+./bbt serve                       # web UI → http://127.0.0.1:8737
 ```
 
 ## Recommended open-source rail projects and tools

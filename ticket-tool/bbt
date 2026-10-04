@@ -1,4 +1,9 @@
 #!/bin/sh
 # Run the ticket tool from anywhere: ln -s "$PWD/bbt" ~/.local/bin/bbt
+# With uv installed, deps are synced into ticket-tool/.venv on first run;
+# otherwise (or with PYTHON=… set) it uses that interpreter's installed deps.
 DIR=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
+if [ -z "$PYTHON" ] && command -v uv >/dev/null 2>&1; then
+  exec uv run --quiet --project "$DIR" bbt "$@"
+fi
 PYTHONPATH="$DIR${PYTHONPATH:+:$PYTHONPATH}" exec "${PYTHON:-python3}" -m bbtickets "$@"

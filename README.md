@@ -186,8 +186,9 @@ Push (ntfy/Telegram) meldet, sobald ein passendes Ticket buchbar oder günstiger
 wird — siehe [`ticket-tool/README.md`](ticket-tool/README.md).
 
 ```bash
-cd ticket-tool && pip install -r requirements.txt
+cd ticket-tool                    # ohne uv: pip install -r requirements.txt
 ./bbt watch add Berlin München --date 2026-10-10 --max-price 30 && ./bbt cron install
+./bbt serve                       # Web-UI → http://127.0.0.1:8737
 ```
 
 ## Empfohlene Open-Source Bahn-Projekte und Tools
