@@ -319,6 +319,41 @@ class ConfigCronTest(TempHome):
             self.assertIn("error:", err.getvalue())
 
 
+class HuntTest(TempHome):
+    def test_top_across_days(self):
+        import contextlib
+        import io
+        from unittest import mock
+        cl, fake = client()
+        prices = {"2030-05-10": [49.9, 21.9], "2030-05-11": [17.9, 99.0]}
+
+        def bestpreis(method, url, headers, data):
+            if url.endswith("angebote/tagesbestpreis"):
+                day = json.loads(data)["reiseHin"]["wunsch"]["zeitWunsch"]["reiseDatum"][:10]
+                conns = [conn(day_at(day, f"{8 + i}:00"), price=p)
+                         for i, p in enumerate(prices[day])]
+                return 200, json.dumps({"tagesbestPreisIntervalle": [
+                    {"intervallAb": f"{day}T00:00:00+02:00",
+                     "intervallBis": f"{day}T23:59:00+02:00",
+                     "angebotsPreis": {"betrag": min(prices[day])},
+                     "verbindungen": conns}]})
+            return fake(method, url, headers, data)
+        cl._transport = bestpreis
+        buf = io.StringIO()
+        with mock.patch.object(cli, "VendoClient", lambda: cl), \
+                contextlib.redirect_stdout(buf), contextlib.redirect_stderr(io.StringIO()):
+            rc = cli.main(["hunt", BERLIN_ID, MUENCHEN_ID, "--date", DAY,
+                           "--days", "2", "--top", "3"])
+        self.assertEqual(rc, 0)
+        out = buf.getvalue()
+        top = out.split("cheapest trains across all days:")[1].strip().splitlines()
+        self.assertEqual(len(top), 3)
+        self.assertIn("€17.90", top[0])
+        self.assertIn("€21.90", top[1])
+        self.assertIn("€49.90", top[2])
+        self.assertIn("Cheapest: Sat 11.05. at €17.90", out)
+
+
 class WebTest(TempHome):
     def setUp(self):
         super().setUp()

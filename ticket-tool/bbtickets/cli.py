@@ -93,6 +93,7 @@ def cmd_hunt(a, client, cfg):
     trip = _trip(client, a, cfg)
     start = date.fromisoformat(a.date) if a.date else date.today()
     rows = []
+    pool: dict[str, object] = {}  # every priced connection seen, for --top
     print(f"{trip.from_name} → {trip.to_name}", file=sys.stderr)
     for i in range(a.days):
         day = start + timedelta(days=i)
@@ -111,6 +112,7 @@ def cmd_hunt(a, client, cfg):
                     continue
                 if a.latest and dep.strftime("%H:%M") > a.latest:
                     continue
+                pool.setdefault(c.key(), c)
                 if best is None or c.price < best.price:
                     best = c
             # Intervals may carry only the price, not priced connections.
@@ -126,6 +128,10 @@ def cmd_hunt(a, client, cfg):
     if priced:
         d, b = min(priced, key=lambda r: r[1].price)
         print(f"\nCheapest: {d:%a %d.%m.} at €{b.price:.2f}")
+    if a.top and pool:
+        top = sorted(pool.values(), key=lambda c: (c.price, c.departure))[:a.top]
+        print(f"\n{len(top)} cheapest trains across all days:")
+        _print_conns(top)
 
 
 class _IntervalHit:
@@ -298,6 +304,8 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("hunt", help="cheapest price per day over a range")
     _route_args(p)
     p.add_argument("--days", type=int, default=7)
+    p.add_argument("--top", type=int, default=0, metavar="N",
+                   help="also list the N cheapest trains across all days")
     p.add_argument("--earliest", help="HH:MM")
     p.add_argument("--latest", help="HH:MM")
     p.set_defaults(fn=cmd_hunt)

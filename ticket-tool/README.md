@@ -10,7 +10,8 @@ last-minute fares:
   becomes bookable or gets cheaper. Examples: a Sparpreis contingent is
   released, a sold-out train opens up again, or the price drops under your
   limit. The notification's button opens the booking page.
-- **Hunt**: the cheapest fare per day over a date range (the
+- **Hunt**: the cheapest fare per day over a date range, `--top N` for the N
+  cheapest trains across all those days (the
   [db-price-hunter](https://github.com/anshamray/db-price-hunter) idea, with one
   request per day).
 - Two front-ends: a CLI and a one-page web UI (stdlib HTTP server, no build
