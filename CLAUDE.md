@@ -51,6 +51,7 @@ caches (`.playwright-mcp/`), signing keys. They're gitignored — keep them out.
   `lib/core/polyline_cache.dart`.
 - `ticket-tool/` (Python, `bbt`) has its own /mob client in
   `bbtickets/vendo.py`; `healthcheck.py`'s `check_ticket_tool` runs that parser
-  live. Offline tests: `cd ticket-tool && python3 -m unittest discover -s tests`.
+  live. Offline tests: `cd ticket-tool && uv run python -m unittest discover -s tests`
+  (or `python3 -m …`). `pyproject.toml` + `uv.lock` back `uv run bbt` / `uv tool install`.
 - New app structure lives under `flutter-app/lib/screens/`,
   `providers/` (Riverpod), `router/` (GoRouter), `services/`.

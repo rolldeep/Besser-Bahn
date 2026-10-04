@@ -32,3 +32,15 @@ jobs:
       - name: Unit tests
         working-directory: ticket-tool
         run: python -m unittest discover -s tests -v
+
+      # The uv quick start: lockfile in sync, package builds, `bbt` entry
+      # point and bundled ui.html work from an installed (non-source) copy.
+      - name: uv quick start
+        working-directory: ticket-tool
+        run: |
+          pip install --quiet uv
+          uv lock --check
+          uv run --quiet bbt cron show
+          uv tool install --quiet .
+          (cd / && "$(uv tool dir --bin)/bbt" serve --port 8799 >/dev/null 2>&1 &) && sleep 3
+          curl -sf http://127.0.0.1:8799/ | grep -q "<html"

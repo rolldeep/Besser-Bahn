@@ -233,6 +233,11 @@ def cmd_cron(a, client, cfg):
         raise SystemExit("`crontab` not found. Add this line to your scheduler "
                          f"manually:\n{line}")
     if a.cron_cmd == "install":
+        if "archive-v" in sys.executable:
+            # `uvx` runs from a throwaway cache env that `uv cache prune` deletes.
+            print("warning: running from a temporary uvx environment; cron "
+                  "will break when uv prunes it. Use `uv tool install` or "
+                  "`uv run` in a clone instead.", file=sys.stderr)
         current.append(line)
     new = "\n".join(current).strip()
     subprocess.run(["crontab", "-"], input=(new + "\n") if new else "",
