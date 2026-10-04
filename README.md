@@ -147,6 +147,7 @@ gesamte Strecke abdeckt — inklusive BahnCard- und Deutschland-Ticket-Rabatten.
 | `api-tests/`         | Health-Checks für alle genutzten Upstream-Endpunkte           |
 | `docs/`              | Projekt-Webseite                                              |
 | `main.py`            | Split-Ticket-Logik auch als eigenständiges Python-CLI         |
+| `ticket-tool/`       | `bbt`: Tickets suchen & buchen, Last-Minute-Wächter per Cron  |
 
 ## Development
 
@@ -176,6 +177,17 @@ Die Split-Ticket-Analyse läuft auch ohne App:
 
 ```bash
 uv run main.py "https://www.bahn.de/buchung/start?vbid=..." [--age 30] [--bahncard BC25_2] [--deutschland-ticket]
+```
+
+### Ticket-Tool & Last-Minute-Wächter
+
+Schlankes CLI + Web-UI zum Suchen und Buchen sowie ein Cron-Wächter, der per
+Push (ntfy/Telegram) meldet, sobald ein passendes Ticket buchbar oder günstiger
+wird — siehe [`ticket-tool/README.md`](ticket-tool/README.md).
+
+```bash
+cd ticket-tool && pip install -r requirements.txt
+./bbt watch add Berlin München --date 2026-10-10 --max-price 30 && ./bbt cron install
 ```
 
 ## Empfohlene Open-Source Bahn-Projekte und Tools

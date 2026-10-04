@@ -2177,6 +2177,49 @@ def check_vendo_weitere_abfahrten() -> str:
             f"{len(WEITERE_ABFAHRTEN_GATTUNGEN)} produktGattungen accepted")
 
 
+def check_ticket_tool() -> str:
+    """ticket-tool/ (`bbt`, the search/book/last-minute-watch CLI + web UI)
+    parses /mob with its OWN Python code. Run that code — not a copy of it —
+    against live answers: station lookup, then a priced journey search. The
+    watcher alerts on `angebote.preise.gesamt.ab.betrag` and books via the
+    connection's recon `kontext`; if either stops parsing, watches would go
+    silent forever instead of failing loudly."""
+    tool = pathlib.Path(__file__).resolve().parent.parent / "ticket-tool"
+    sys.path.insert(0, str(tool))
+    try:
+        from bbtickets.vendo import Trip, VendoClient, berlin
+    finally:
+        sys.path.remove(str(tool))
+
+    def transport(method, url, headers, data):
+        r = _with_retry(lambda u, **kw: _raw_request(method, u, **kw))(
+            url, headers=headers, data=data, timeout=TIMEOUT)
+        return r.status_code, r.text
+
+    client = VendoClient(min_interval=0, transport=transport)  # _pace paces
+    hits = client.stations("Kiel Hbf")
+    if not hits or hits[0].eva != KIEL:
+        raise CheckError(f"bbt station lookup: expected Kiel Hbf ({KIEL}) "
+                         f"first, got {[(h.name, h.eva) for h in hits[:3]]}")
+    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+    conns, _ = client.search(Trip(from_id=KIEL_LOC, to_id=BERLIN_LOC),
+                             berlin(tomorrow, "08:00"))
+    if not conns:
+        raise CheckError("bbt parsed no connections from angebote/fahrplan")
+    c = conns[0]
+    if not (c.departure and c.arrival and c.trains):
+        raise CheckError(f"bbt connection lacks times/trains: {c.to_dict()}")
+    priced = [x for x in conns if x.price is not None]
+    if not priced:
+        raise CheckError("bbt parsed no price on any connection — watches "
+                         "would never fire")
+    if not c.kontext or "¶" not in c.kontext:
+        raise CheckError("bbt connection carries no recon kontext — booking "
+                         "links fall back to a plain search")
+    return (f"{len(conns)} conns, {len(priced)} priced, first "
+            f"{'+'.join(c.trains)} {c.departure:%H:%M} ab €{priced[0].price:.2f}")
+
+
 def check_vendo_train_polyline() -> str:
     """
     GET /mob/zuglauf/{id} — the exact track geometry DB Navigator draws on its
@@ -3954,6 +3997,7 @@ CHECKS = [
     ("vendo stopover split (Aufenthalt)", check_vendo_stopover_split, False),
     ("vendo weitere abfahrten (segment)", check_vendo_weitere_abfahrten, False),
     ("vendo share journey (teilen vbid)", check_vendo_share, False),
+    ("ticket-tool parser (bbt search/watch)", check_ticket_tool, False),
     ("vendo train polyline (zuglauf)", check_vendo_train_polyline, False),
     ("vendo seat map (gsd free seats)", check_vendo_seat_map, False),
     ("prediction service (bahn.chuk.dev scores)", check_prediction_service, True),

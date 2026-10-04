@@ -1,0 +1,4 @@
+#!/bin/sh
+# Run the ticket tool from anywhere: ln -s "$PWD/bbt" ~/.local/bin/bbt
+DIR=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
+PYTHONPATH="$DIR${PYTHONPATH:+:$PYTHONPATH}" exec "${PYTHON:-python3}" -m bbtickets "$@"

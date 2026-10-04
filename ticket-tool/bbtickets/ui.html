@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Besser-Bahn Tickets</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #fff; --fg: #15181d; --muted: #667080;
+    --line: #e2e5ea; --accent: #d6001c; --accent-fg: #fff; --ok: #0a7d3b;
+    --warn: #b25b00; --chip: #eef0f3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f1114; --card: #181b20; --fg: #e8eaed; --muted: #9aa3ae;
+      --line: #2a2f36; --accent: #ff4157; --chip: #22262c; --ok: #4cc27f; --warn: #f0a33a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px; }
+  header { display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; margin: 4px 0 16px; }
+  h1 { font-size: 20px; margin: 0; }
+  h1 span { color: var(--accent); }
+  h2 { font-size: 15px; margin: 0 0 12px; text-transform: uppercase;
+    letter-spacing: .04em; color: var(--muted); }
+  .card { background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+  .grid > * { grid-column: span 3; min-width: 0; }
+  .s2 { grid-column: span 2; } .s6 { grid-column: span 6; }
+  @media (max-width: 560px) { .grid > *, .s2 { grid-column: span 6; } .half { grid-column: span 3 !important; } }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+  input, select, button { font: inherit; color: inherit; }
+  input, select { width: 100%; padding: 9px 10px; border: 1px solid var(--line);
+    border-radius: 8px; background: var(--bg); }
+  input[type=checkbox] { width: auto; margin-right: 6px; }
+  .check { display: flex; align-items: center; font-size: 14px; padding-top: 18px; }
+  button { border: 1px solid var(--line); background: var(--chip); border-radius: 8px;
+    padding: 8px 12px; cursor: pointer; white-space: nowrap; }
+  button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: progress; }
+  .route { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: end; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+  .conn { display: flex; gap: 12px; align-items: center; padding: 12px 0;
+    border-top: 1px solid var(--line); }
+  .conn:first-child { border-top: 0; }
+  .conn .main { flex: 1; min-width: 0; }
+  .times { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .meta { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+  .price { font-weight: 700; font-variant-numeric: tabular-nums; min-width: 70px; text-align: right; }
+  .price.none { color: var(--muted); font-weight: 400; font-size: 13px; }
+  .late { color: var(--warn); }
+  .pill { white-space: nowrap; font-size: 12px; padding: 3px 8px; border-radius: 99px; background: var(--chip); color: var(--muted); }
+  .pill.ok { color: var(--ok); }
+  .pill.warn { color: var(--warn); }
+  .msg { padding: 10px 12px; border-radius: 8px; background: var(--chip); margin-top: 12px; font-size: 14px; }
+  .msg.err { color: var(--accent); }
+  .empty { color: var(--muted); font-size: 14px; }
+  .watch { padding: 12px 0; border-top: 1px solid var(--line); }
+  .watch:first-child { border-top: 0; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+  @media (max-width: 560px) { h1 { font-size: 17px; } .conn { flex-wrap: wrap; } .conn .btns { width: 100%; display: flex; gap: 8px; justify-content: flex-end; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1><span>●</span> Besser-Bahn Tickets</h1>
+    <span id="status" class="pill">…</span>
+  </header>
+
+  <section class="card">
+    <h2>Search &amp; book</h2>
+    <form id="search">
+      <div class="route">
+        <div><label for="from">From</label><input id="from" list="dl-from" autocomplete="off" required placeholder="Berlin Hbf"></div>
+        <button type="button" id="swap" title="Swap" aria-label="Swap">⇄</button>
+        <div><label for="to">To</label><input id="to" list="dl-to" autocomplete="off" required placeholder="München Hbf"></div>
+      </div>
+      <datalist id="dl-from"></datalist><datalist id="dl-to"></datalist>
+      <div class="grid" style="margin-top:10px">
+        <div class="s2 half"><label for="date">Date</label><input id="date" type="date" required></div>
+        <div class="s2 half"><label for="time">Time</label><input id="time" type="time" required></div>
+        <div class="s2 check"><label class="check" style="padding:0;margin:0;color:inherit"><input id="arrive" type="checkbox">Arrive by</label></div>
+        <div class="s2 half"><label for="klasse">Class</label><select id="klasse"><option value="2">2nd</option><option value="1">1st</option></select></div>
+        <div class="s2 half"><label for="bahncard">BahnCard</label><select id="bahncard"><option value="">none</option></select></div>
+        <div class="s2 half"><label for="adults">Adults</label><input id="adults" type="number" min="1" max="9" value="1"></div>
+        <div class="s2 half"><label for="max_transfers">Max changes</label><input id="max_transfers" type="number" min="0" max="5" placeholder="any"></div>
+        <div class="s2 check"><label class="check" style="padding:0;margin:0;color:inherit"><input id="dticket" type="checkbox">I have a Deutschlandticket</label></div>
+      </div>
+      <div class="actions"><button class="primary" id="go">Search</button></div>
+    </form>
+    <div id="results"></div>
+  </section>
+
+  <section class="card">
+    <h2>Last-minute watches</h2>
+    <p class="meta" style="margin-top:-6px">Uses the route &amp; travellers above. You get a push when a matching ticket becomes bookable or gets cheaper.</p>
+    <form id="watchform" class="grid">
+      <div class="s2 half"><label for="w_date">Date</label><input id="w_date" type="date" required></div>
+      <div class="s2 half"><label for="w_earliest">Depart from</label><input id="w_earliest" type="time" value="06:00"></div>
+      <div class="s2 half"><label for="w_latest">Depart until</label><input id="w_latest" type="time" value="22:00"></div>
+      <div class="s2 half"><label for="w_max">Max price €</label><input id="w_max" type="number" step="0.01" min="0" placeholder="any bookable"></div>
+      <div class="s2 half"><label for="w_train">Train(s)</label><input id="w_train" placeholder="e.g. ICE 597"></div>
+      <div class="s2 half"><label for="w_label">Label</label><input id="w_label" placeholder="optional"></div>
+      <div class="s6 actions" style="margin-top:0"><button type="button" id="checkall">Check all now</button><button class="primary">Add watch</button></div>
+    </form>
+    <div id="wmsg"></div>
+    <div id="watches" style="margin-top:8px"></div>
+  </section>
+
+  <details class="card">
+    <summary>Notifications &amp; cron</summary>
+    <div class="meta" style="margin-top:10px">
+      Set a channel from the terminal, e.g. <code>bbt config set notify.ntfy_topic &lt;long-random-topic&gt;</code>
+      and subscribe to the same topic in the ntfy app. Install the checker with <code>bbt cron install --every 10</code>,
+      or start this UI with <code>bbt serve --watch-every 10</code>.
+      <div class="row" style="margin-top:10px"><button type="button" id="ntest">Send test notification</button></div>
+    </div>
+  </details>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const token = new URLSearchParams(location.search).get("token");
+const stations = {};   // display name -> location id
+let lastSearch = null; // {body, from, to}
+
+async function api(method, path, body) {
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["X-BBT-Token"] = token;
+  const r = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  const data = await r.json().catch(() => ({ error: `HTTP ${r.status}` }));
+  if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+  return data;
+}
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const hm = (iso) => iso ? new Date(iso).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" }) : "?";
+const dur = (m) => m == null ? "" : `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`;
+const eur = (p) => p == null ? null : `€${p.toFixed(2)}`;
+const berlinNow = () => new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Berlin" }));
+const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+function stationVal(input) { const v = input.value.trim(); return stations[v] || v; }
+
+function suggest(input, list) {
+  let t;
+  input.addEventListener("input", () => {
+    clearTimeout(t);
+    const q = input.value.trim();
+    if (q.length < 3 || stations[q]) return;
+    t = setTimeout(async () => {
+      try {
+        const hits = await api("GET", `/api/stations?q=${encodeURIComponent(q)}`);
+        list.innerHTML = hits.map((s) => { stations[s.name] = s.id; return `<option value="${esc(s.name)}">`; }).join("");
+      } catch (e) { /* typing on; search will resolve the name */ }
+    }, 450);
+  });
+}
+
+function travellers() {
+  return {
+    from: stationVal($("from")), to: stationVal($("to")),
+    klasse: $("klasse").value, bahncard: $("bahncard").value,
+    adults: +$("adults").value || 1, dticket: $("dticket").checked,
+    max_transfers: $("max_transfers").value,
+  };
+}
+
+function remember() {
+  try { localStorage.setItem("bbt", JSON.stringify({ f: $("from").value, t: $("to").value, s: stations,
+    k: $("klasse").value, b: $("bahncard").value, a: $("adults").value, d: $("dticket").checked })); } catch (e) {}
+}
+function restore() {
+  try {
+    const s = JSON.parse(localStorage.getItem("bbt") || "null"); if (!s) return;
+    Object.assign(stations, s.s || {}); $("from").value = s.f || ""; $("to").value = s.t || "";
+    $("klasse").value = s.k || "2"; $("bahncard").value = s.b || ""; $("adults").value = s.a || 1; $("dticket").checked = !!s.d;
+  } catch (e) {}
+}
+
+function connRow(c, i) {
+  const late = c.delay_min > 0 ? ` <span class="late">+${c.delay_min}</span>` : "";
+  const changes = c.transfers === 0 ? "direct" : `${c.transfers}× change`;
+  const price = c.price != null ? `<div class="price">${eur(c.price)}</div>` : `<div class="price none">sold out / no fare</div>`;
+  return `<div class="conn">
+    <div class="main"><div class="times">${hm(c.departure)}${late} → ${hm(c.arrival)} <span class="meta">${dur(c.duration_min)}</span></div>
+      <div class="meta">${esc(c.trains.join(" · "))} · ${changes}</div></div>
+    ${price}
+    <div class="btns"><button type="button" data-watch="${i}">Watch</button>
+      ${c.price != null ? `<button type="button" class="primary" data-book="${i}">Book</button>` : ""}</div>
+  </div>`;
+}
+
+$("search").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const body = { ...travellers(), date: $("date").value, time: $("time").value, arrive: $("arrive").checked };
+  $("go").disabled = true; $("results").innerHTML = `<div class="msg">Searching…</div>`;
+  try {
+    const r = await api("POST", "/api/search", body);
+    stations[r.from.name] = r.from.id; stations[r.to.name] = r.to.id;
+    $("from").value = r.from.name; $("to").value = r.to.name; remember();
+    lastSearch = { body, ...r };
+    $("w_date").value = body.date;
+    $("results").innerHTML = r.connections.length
+      ? `<div style="margin-top:12px">${r.connections.map(connRow).join("")}</div>`
+      : `<div class="msg">No connections found.</div>`;
+  } catch (err) {
+    $("results").innerHTML = `<div class="msg err">${esc(err.message)}</div>`;
+  } finally { $("go").disabled = false; }
+});
+
+$("results").addEventListener("click", async (e) => {
+  const b = e.target.closest("button"); if (!b || !lastSearch) return;
+  if (b.dataset.book) {
+    const c = lastSearch.connections[+b.dataset.book];
+    // Open the tab synchronously so popup blockers allow it, fill it after.
+    const win = window.open("about:blank", "_blank");
+    b.disabled = true; b.textContent = "…";
+    try {
+      const r = await api("POST", "/api/book", { ...lastSearch.body, from: lastSearch.from.id, to: lastSearch.to.id,
+        kontext: c.kontext, departure: c.departure, origin: c.origin, destination: c.destination });
+      if (win) win.location = r.url; else location.href = r.url;
+    } catch (err) { if (win) win.close(); alert(err.message); }
+    finally { b.disabled = false; b.textContent = "Book"; }
+  } else if (b.dataset.watch) {
+    const c = lastSearch.connections[+b.dataset.watch];
+    $("w_date").value = lastSearch.body.date;
+    $("w_earliest").value = hm(c.departure); $("w_latest").value = hm(c.departure);
+    $("w_train").value = c.trains.length === 1 ? c.trains[0] : "";
+    $("w_max").value = c.price != null ? Math.max(0, c.price - 0.01).toFixed(2) : "";
+    $("w_max").placeholder = "any bookable";
+    $("watchform").scrollIntoView({ behavior: "smooth" });
+    $("w_max").focus();
+  }
+});
+
+$("swap").addEventListener("click", () => { [$("from").value, $("to").value] = [$("to").value, $("from").value]; });
+
+async function loadWatches() {
+  try {
+    const ws = await api("GET", "/api/watches");
+    $("watches").innerHTML = ws.length ? ws.map((w) => {
+      const st = w.state || {};
+      const crit = [w.max_price != null ? `≤ ${eur(w.max_price)}` : "any bookable fare",
+        w.trains?.length ? w.trains.join("/") : null, w.max_transfers != null ? `≤${w.max_transfers} changes` : null].filter(Boolean).join(" · ");
+      let s = st.last_check ? `checked ${st.last_check.slice(11, 16)}` : "not checked yet";
+      if (st.cheapest != null) s += ` · cheapest now ${eur(st.cheapest)}`;
+      const hits = Object.keys(st.notified || {}).length;
+      const pill = st.last_error ? `<span class="pill warn" title="${esc(st.last_error)}">error</span>`
+        : hits ? `<span class="pill ok">${hits} match${hits > 1 ? "es" : ""}</span>` : `<span class="pill">waiting</span>`;
+      return `<div class="watch"><div class="row" style="justify-content:space-between">
+        <div class="main"><div class="times">${w.label ? esc(w.label) + ": " : ""}${esc(w.from_name)} → ${esc(w.to_name)}</div>
+        <div class="meta">${esc(w.date)} ${esc(w.earliest)}–${esc(w.latest)} · ${esc(crit)}</div>
+        <div class="meta">${esc(s)}</div></div>
+        <div class="row">${pill}<button type="button" data-check="${esc(w.id)}">Check</button><button type="button" data-del="${esc(w.id)}" aria-label="Delete">✕</button></div>
+      </div></div>`;
+    }).join("") : `<div class="empty">No watches yet.</div>`;
+  } catch (err) { $("watches").innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
+}
+
+function showCheck(res) {
+  const lines = res.map((r) => r.status === "error" ? `⚠ ${r.error}`
+    : r.status === "expired" ? "window passed — removed"
+    : `${r.matches.length} match(es), ${r.new} new${r.link ? ` — <a href="${esc(r.link)}" target="_blank" rel="noopener">book cheapest</a>` : ""}`);
+  $("wmsg").innerHTML = `<div class="msg">${lines.join("<br>") || "No watches."}</div>`;
+}
+
+$("watches").addEventListener("click", async (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  b.disabled = true;
+  try {
+    if (b.dataset.del) await api("DELETE", `/api/watches/${b.dataset.del}`);
+    else if (b.dataset.check) showCheck(await api("POST", "/api/check", { id: b.dataset.check }));
+  } catch (err) { $("wmsg").innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
+  loadWatches();
+});
+
+$("watchform").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const body = { ...travellers(), date: $("w_date").value, earliest: $("w_earliest").value, latest: $("w_latest").value,
+    max_price: $("w_max").value || null, train: $("w_train").value, label: $("w_label").value };
+  if (!body.from || !body.to) { $("wmsg").innerHTML = `<div class="msg err">Fill in From and To above.</div>`; return; }
+  try {
+    const w = await api("POST", "/api/watches", body);
+    $("wmsg").innerHTML = `<div class="msg">Watching ${esc(w.from_name)} → ${esc(w.to_name)} on ${esc(w.date)}.</div>`;
+    remember(); loadWatches();
+  } catch (err) { $("wmsg").innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
+});
+
+$("checkall").addEventListener("click", async (e) => {
+  e.target.disabled = true; $("wmsg").innerHTML = `<div class="msg">Checking… (requests are paced to respect DB's rate limit)</div>`;
+  try { showCheck(await api("POST", "/api/check", {})); }
+  catch (err) { $("wmsg").innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
+  e.target.disabled = false; loadWatches();
+});
+
+$("ntest").addEventListener("click", async () => {
+  try { const r = await api("POST", "/api/notify-test", {}); alert(r.errors.length ? r.errors.join("\n") : "Sent."); }
+  catch (err) { alert(err.message); }
+});
+
+(async function init() {
+  const now = berlinNow();
+  $("date").value = ymd(now); $("w_date").value = ymd(now);
+  $("time").value = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  suggest($("from"), $("dl-from")); suggest($("to"), $("dl-to"));
+  try {
+    const s = await api("GET", "/api/status");
+    $("bahncard").innerHTML = `<option value="">none</option>` + s.bahncards.map((b) => `<option value="${b}">${b.toUpperCase().replace("-1", " · 1st")}</option>`).join("");
+    if (s.defaults.bahncard) $("bahncard").value = s.defaults.bahncard;
+    if (s.defaults.first_class) $("klasse").value = "1";
+    $("status").textContent = s.channels.length ? `🔔 ${s.channels.join(", ")}` : "🔕 not set up";
+    $("status").className = "pill " + (s.channels.length ? "ok" : "warn");
+  } catch (err) { $("status").textContent = err.message; }
+  restore();
+  loadWatches();
+})();
+</script>
+</body>
+</html>

@@ -1,7 +1,8 @@
 # Besser-Bahn
 
 Premium Deutsche-Bahn companion app. Flutter app in `flutter-app/`, self-hosted
-delay-prediction API in `prediction-service/`, API probes in `api-tests/`.
+delay-prediction API in `prediction-service/`, API probes in `api-tests/`,
+ticket search/book CLI + cron last-minute fare watcher in `ticket-tool/`.
 
 ## Workflow — ALWAYS commit & push after changes
 
@@ -36,8 +37,8 @@ asserts the response still has the shape we parse.
 
 ## Repo hygiene
 
-Only Flutter app code, the prediction service, api-tests, and docs belong in the
-repo. Do **not** commit dev artifacts: screenshots (`screenshot-*.png`), tool
+Only Flutter app code, the prediction service, api-tests, ticket-tool, and docs
+belong in the repo. Do **not** commit dev artifacts: screenshots (`screenshot-*.png`), tool
 caches (`.playwright-mcp/`), signing keys. They're gitignored — keep them out.
 
 ## Architecture notes
@@ -48,5 +49,8 @@ caches (`.playwright-mcp/`), signing keys. They're gitignored — keep them out.
 - Route map geometry comes from `GET /mob/zuglauf/{id}` (`zuglauf.v2+json`) —
   the exact track polyline DB draws on its own map. Cached per physical route in
   `lib/core/polyline_cache.dart`.
+- `ticket-tool/` (Python, `bbt`) has its own /mob client in
+  `bbtickets/vendo.py`; `healthcheck.py`'s `check_ticket_tool` runs that parser
+  live. Offline tests: `cd ticket-tool && python3 -m unittest discover -s tests`.
 - New app structure lives under `flutter-app/lib/screens/`,
   `providers/` (Riverpod), `router/` (GoRouter), `services/`.
