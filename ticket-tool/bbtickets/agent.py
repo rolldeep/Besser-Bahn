@@ -129,11 +129,9 @@ TOOLS = [
               "url": {"type": "string"}}, ["title", "message"])),
 ]
 
-SYSTEM = """You are the Besser-Bahn ticket agent: you find the cheapest \
-Deutsche Bahn tickets, fast.
-
-Now: {now} (Europe/Berlin).
-Traveller unless the user says otherwise: 1 adult, BahnCard 25, 2nd class. \
+# How to use the tools well. Shared with `bbt mcp`, which sends it to MCP
+# clients (LibreChat) as the server instructions.
+GUIDE = """Traveller unless the user says otherwise: 1 adult, BahnCard 25, 2nd class. \
 Prices from the tools already include the BahnCard 25 discount.
 
 Every tool call costs DB requests (~2 s each; DB blocks bursts of ~10), so:
@@ -150,6 +148,12 @@ regular checks that run from cron without you.
 Answer briefly: the cheapest option first (day, departure → arrival, train, \
 changes, price in €) with its booking link, then up to four alternatives if \
 they help. Say when a price is only known for a time slot."""
+
+SYSTEM = """You are the Besser-Bahn ticket agent: you find the cheapest \
+Deutsche Bahn tickets, fast.
+
+Now: {now} (Europe/Berlin).
+""" + GUIDE
 
 UNATTENDED = """
 

@@ -15,6 +15,9 @@ from .vendo import (BAHNCARDS, BERLIN, Connection, Station, Trip, VendoClient,
                     berlin)
 
 DEFAULT_BAHNCARD = "bc25"
+# Refs remembered for booking_link. A long-running `bbt mcp` server shares one
+# TicketTools across all chats, so keep only the most recent ones.
+MAX_REFS = 2000
 
 
 def _local(dt: datetime | None) -> str | None:
@@ -31,6 +34,7 @@ class TicketTools:
         # Connections handed to the model, by ref, so booking_link can mint
         # the exact-train link later without searching again.
         self._seen: dict[str, tuple[Connection, Trip]] = {}
+        self._refs = 0
         self._lock = threading.Lock()  # the agent may run tools in parallel
 
     # -- helpers ---------------------------------------------------------------
@@ -69,8 +73,11 @@ class TicketTools:
                     "note": "DB only gave a price for this time slot; "
                             "use search_connections for that time to get trains"}
         with self._lock:
-            ref = f"c{len(self._seen) + 1}"
+            self._refs += 1
+            ref = f"c{self._refs}"
             self._seen[ref] = (c, trip)
+            if len(self._seen) > MAX_REFS:
+                del self._seen[next(iter(self._seen))]
         d = c.duration
         return {"ref": ref, "departure": _local(c.departure),
                 "arrival": _local(c.arrival), "trains": c.trains,
@@ -169,8 +176,8 @@ class TicketTools:
 
     def booking_link(self, ref: str) -> dict:
         if ref not in self._seen:
-            raise ValueError(f"unknown ref '{ref}' — use a ref from a search "
-                             "result in this conversation")
+            raise ValueError(f"unknown or expired ref '{ref}' — use a ref "
+                             "from a recent search result, or search again")
         c, trip = self._seen[ref]
         return {"ref": ref, "connection": watcher.fmt_conn(c),
                 "url": self.client.booking_link(c, trip),

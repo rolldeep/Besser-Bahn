@@ -19,6 +19,8 @@ last-minute fares:
 - **Agent** (`bbt agent`): ask in plain words ("cheapest to Berlin next week?",
   "weekend deals to Köln?"). A Claude agent answers with BahnCard 25 prices,
   using all of the above as tools, with optional Langfuse tracing.
+- **LibreChat**: the same agent in [LibreChat](https://www.librechat.ai), with
+  chat history and a phone-friendly UI. `bbt mcp` serves the tools over MCP.
 
 It talks to the same DB Navigator backend (`app.services-bahn.de/mob`) as the
 Besser-Bahn app. The bahn.de website API is Akamai-blocked for scripts.
@@ -189,6 +191,57 @@ cost) and one span per tool call with its arguments and the DB result. A chat
 session's turns share a session id. The spans come from
 `openinference-instrumentation-claude-agent-sdk` through Langfuse's
 OpenTelemetry exporter. `BBT_AGENT_TRACE=0` turns tracing off.
+
+## Chat in LibreChat
+
+[LibreChat](https://www.librechat.ai) can run the agent instead of the CLI.
+LibreChat provides the model, the chat UI (also on a phone), the history and
+the Langfuse tracing. `bbt mcp` provides the tools: the same tools, tool guide
+and BahnCard 25 default as `bbt agent`, served over MCP.
+
+`librechat/` holds a `librechat.yaml` and a `docker-compose.override.yml` for
+LibreChat's Docker setup. They add a `bbt-mcp` container (built from this
+folder's `Dockerfile`) and a **Besser-Bahn tickets** model spec. The spec uses
+`claude-opus-5-5` (effort `low`) with the `bbt` MCP server attached.
+
+```bash
+git clone https://github.com/danny-avila/LibreChat && cd LibreChat
+cp .env.example .env
+cp ../Besser-Bahn/ticket-tool/librechat/librechat.yaml .
+cp ../Besser-Bahn/ticket-tool/librechat/docker-compose.override.yml .
+mkdir -p ~/.config/besser-bahn-tickets     # watches/config, shared with the host's bbt
+echo "ANTHROPIC_API_KEY=sk-ant-…" >> .env
+echo "BBT_MCP_TOKEN=$(openssl rand -hex 32)" >> .env
+echo "BBT_SRC=$HOME/Besser-Bahn/ticket-tool" >> .env   # default: ../Besser-Bahn/ticket-tool
+docker compose up -d --build               # → http://localhost:3080
+```
+
+Then pick **Besser-Bahn tickets** in the model menu and ask. If you already
+have a `librechat.yaml` or an override file, merge the `mcpSettings`,
+`mcpServers` and `modelSpecs` sections (and the `bbt-mcp` service) into yours.
+If the model isn't offered, add it to `ANTHROPIC_MODELS` in `.env`.
+
+- **Tracing**: set `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` and
+  `LANGFUSE_BASE_URL` in LibreChat's `.env`. LibreChat then traces each run
+  itself, with tool calls and token costs.
+- **Watches** added from the chat land in `~/.config/besser-bahn-tickets`
+  (`BBT_HOME_DIR` changes it), so `bbt check` from the host's cron runs them.
+  Notification channels set with `bbt config set notify.…` apply too.
+- **Unattended runs** stay with `bbt agent --notify` (cron, above). LibreChat
+  only answers when you chat with it.
+- **DB blocks datacenter IPs**, so run LibreChat at home, as with the rest of
+  the tool.
+
+Without Docker for bbt, run the server on the host:
+
+```bash
+uv run --extra mcp bbt mcp --http --host 0.0.0.0 --token "$BBT_MCP_TOKEN"   # :8738/mcp
+```
+
+Then use `url: http://host.docker.internal:8738/mcp` in `librechat.yaml`,
+allow `'host.docker.internal:8738'` under `mcpSettings.allowedAddresses`, and
+drop the `bbt-mcp` service from the override. Without `--http`, `bbt mcp`
+speaks stdio, for MCP clients that start the server themselves.
 
 ## Notes & limits
 

@@ -18,6 +18,11 @@ agent = [
     "langfuse>=4.17",
     "openinference-instrumentation-claude-agent-sdk>=0.1.20",
 ]
+# `bbt mcp`: the agent's tools as an MCP server for LibreChat (see librechat/)
+mcp = [
+    "mcp>=2.3,<3",
+    "uvicorn>=0.30",
+]
 
 [project.scripts]
 bbt = "bbtickets.cli:main"

@@ -1,0 +1,52 @@
+# LibreChat config for the Besser-Bahn ticket agent.
+#
+# Copy to your LibreChat checkout as `librechat.yaml` (or merge these sections
+# into the one you have). LibreChat runs the agent: the model, chat UI, history
+# and Langfuse tracing. `bbt mcp` (service `bbt-mcp` in
+# docker-compose.override.yml) supplies the tools. Setup: ../README.md,
+# "Chat in LibreChat".
+version: 1.3.17
+cache: true
+
+mcpSettings:
+  # LibreChat blocks MCP servers on private addresses (SSRF guard) unless
+  # they're listed here; bbt-mcp is a container on the compose network.
+  allowedAddresses:
+    - 'bbt-mcp:8738'
+
+mcpServers:
+  bbt:
+    title: Besser-Bahn tickets
+    description: DB fares (BahnCard 25), weekend deals, booking links, watches
+    type: streamable-http
+    url: http://bbt-mcp:8738/mcp
+    headers:
+      Authorization: 'Bearer ${BBT_MCP_TOKEN}'
+    # DB requests are paced 2 s apart: cheapest_fares over 31 days needs about
+    # a minute, so allow longer than LibreChat's 60 s default.
+    timeout: 300000
+    # Adds the tool guide (bbtickets/agent.py GUIDE) to the system prompt.
+    serverInstructions: true
+
+modelSpecs:
+  list:
+    - name: bbt-agent
+      label: Besser-Bahn tickets
+      description: Cheapest Deutsche Bahn tickets, BahnCard 25 prices
+      softDefault: true
+      mcpServers: ["bbt"]
+      conversation_starters:
+        - Cheapest Hildesheim → Berlin next week, mornings only?
+        - Weekend deals Hamburg ↔ Köln for the next 3 weekends, under €60
+        - Watch Berlin → München next Friday 07:00–10:00 under €30
+        - Show my watches
+      preset:
+        endpoint: anthropic
+        model: "claude-opus-5-5"
+        effort: low
+        modelLabel: Besser-Bahn
+        greeting: Where to? I find the cheapest DB tickets (BahnCard 25, 2nd class).
+        promptPrefix: |
+          You are the Besser-Bahn ticket agent: you find the cheapest Deutsche
+          Bahn tickets, fast, using the Besser-Bahn tools.
+          Now: {{current_datetime}}. Dates and times are Europe/Berlin.
