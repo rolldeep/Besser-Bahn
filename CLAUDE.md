@@ -57,5 +57,10 @@ caches (`.playwright-mcp/`), signing keys. They're gitignored — keep them out.
   only tools are `bbtickets/agent_tools.py` (plain, SDK-free, tested offline);
   BahnCard 25 by default; Langfuse tracing via OpenInference when
   `LANGFUSE_*` keys are set. Fare logic shared with `hunt` lives in `deals.py`.
+- `bbt mcp` (`bbtickets/mcp_server.py`, extra `[mcp]`): the same tools + `GUIDE`
+  as an MCP server (stdio, or streamable HTTP with a bearer token) so LibreChat
+  runs the agent. Config in `ticket-tool/librechat/`, image from
+  `ticket-tool/Dockerfile`. Keep `librechat.yaml` in sync with `agent.TOOLS` /
+  `DEFAULT_MODEL` (`tests/test_mcp.py` checks it).
 - New app structure lives under `flutter-app/lib/screens/`,
   `providers/` (Riverpod), `router/` (GoRouter), `services/`.

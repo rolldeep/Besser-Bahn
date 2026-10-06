@@ -8,6 +8,7 @@
   bbt cron install --every 10    # add the crontab line
   bbt serve                      # web UI on http://127.0.0.1:8737
   bbt agent "cheapest Hamburg → Köln next week?"   # Claude agent (BahnCard 25)
+  bbt mcp --http                 # the agent's tools for LibreChat (MCP)
   bbt config set notify.ntfy_topic my-secret-topic && bbt notify-test
 """
 from __future__ import annotations
@@ -252,6 +253,13 @@ def cmd_agent(a, client, cfg):
     return agent.main(a, TicketTools(client, cfg, bahncard=bahncard))
 
 
+def cmd_mcp(a, client, cfg):
+    from . import mcp_server
+    from .agent_tools import TicketTools
+    bahncard = None if a.bahncard == "none" else a.bahncard
+    return mcp_server.main(a, TicketTools(client, cfg, bahncard=bahncard))
+
+
 def _route_args(p, watch=False):
     p.add_argument("origin", help="from station (name or HAFAS id)")
     p.add_argument("destination", help="to station")
@@ -358,6 +366,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-v", "--verbose", action="store_true",
                    help="show tool calls, turns and cost")
     p.set_defaults(fn=cmd_agent)
+
+    p = sub.add_parser("mcp", help="serve the agent's tools over MCP (LibreChat)")
+    p.add_argument("--http", action="store_true",
+                   help="streamable HTTP on --host/--port instead of stdio")
+    p.add_argument("--host", default="127.0.0.1")
+    p.add_argument("--port", type=int, default=8738)
+    p.add_argument("--token", default=os.environ.get("BBT_MCP_TOKEN"),
+                   help="require 'Authorization: Bearer …' (needed off loopback)")
+    p.add_argument("--bahncard", default="bc25",
+                   choices=sorted(BAHNCARDS) + ["none"])
+    p.set_defaults(fn=cmd_mcp)
     return ap
 
 

@@ -1,0 +1,4 @@
+.venv
+tests
+librechat
+**/__pycache__

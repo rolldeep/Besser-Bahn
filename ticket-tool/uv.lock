@@ -64,16 +64,22 @@ agent = [
     { name = "langfuse" },
     { name = "openinference-instrumentation-claude-agent-sdk" },
 ]
+mcp = [
+    { name = "mcp" },
+    { name = "uvicorn" },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "claude-agent-sdk", marker = "extra == 'agent'", specifier = ">=0.2.159" },
     { name = "curl-cffi", specifier = ">=0.7" },
     { name = "langfuse", marker = "extra == 'agent'", specifier = ">=4.17" },
+    { name = "mcp", marker = "extra == 'mcp'", specifier = ">=2.3,<3" },
     { name = "openinference-instrumentation-claude-agent-sdk", marker = "extra == 'agent'", specifier = ">=0.1.20" },
     { name = "requests", specifier = ">=2.31" },
+    { name = "uvicorn", marker = "extra == 'mcp'", specifier = ">=0.30" },
 ]
-provides-extras = ["agent"]
+provides-extras = ["agent", "mcp"]
 
 [[package]]
 name = "certifi"
