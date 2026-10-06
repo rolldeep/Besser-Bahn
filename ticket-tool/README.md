@@ -16,6 +16,9 @@ last-minute fares:
   request per day).
 - Two front-ends: a CLI and a one-page web UI (stdlib HTTP server, no build
   step, works on a phone).
+- **Agent** (`bbt agent`): ask in plain words ("cheapest to Berlin next week?",
+  "weekend deals to Köln?"). A Claude agent answers with BahnCard 25 prices,
+  using all of the above as tools, with optional Langfuse tracing.
 
 It talks to the same DB Navigator backend (`app.services-bahn.de/mob`) as the
 Besser-Bahn app. The bahn.de website API is Akamai-blocked for scripts.
@@ -130,6 +133,62 @@ How a check decides what to send:
 
 A watch deletes itself once its departure window has passed. Each check only
 searches from *now* to the window end, so past departures are ignored.
+
+## Ask the agent (Claude + Langfuse)
+
+`bbt agent` is a Claude agent built on the
+[Claude Agent SDK](https://code.claude.com/docs/en/agent-sdk). It can use
+every tool listed below and nothing else: Claude Code's built-in Bash, file
+and web tools are switched off. Prices default to a **BahnCard 25, 2nd class**
+traveller.
+
+```bash
+uv sync --extra agent                 # or: pip install './ticket-tool[agent]'
+export ANTHROPIC_API_KEY=sk-ant-…
+uv run bbt agent "Cheapest Hildesheim → Berlin next week, mornings only?"
+uv run bbt agent "Weekend deals Hamburg ↔ Köln for the next 3 weekends, under €60"
+uv run bbt agent                      # interactive chat (follow-ups keep context)
+uv run bbt agent -v "…"               # also show tool calls, turns and $ cost
+```
+
+| Tool                 | What it does                                                         | DB requests |
+| -------------------- | -------------------------------------------------------------------- | ----------- |
+| `cheapest_fares`     | cheapest fare per day over a range + N cheapest trains (Bestpreis)  | 1 per day   |
+| `weekend_deals`      | quick weekend sale check: cheapest Fri/Sat out + Sun (Mon) back per weekend, round-trip totals | ~3 per weekend |
+| `search_connections` | priced connections around one date/time                              | 1           |
+| `booking_link`       | bahn.de link that opens that exact train                             | 1           |
+| `find_station`       | station lookup (only when a name is ambiguous)                       | 1           |
+| `add_watch` / `list_watches` / `remove_watch` / `check_watches` | the last-minute watches above | 0–4 each |
+| `send_notification`  | push to your ntfy / Telegram / command channels                      | 0           |
+
+Options: `--bahncard bc50|bc25-1|none…`, `--model` (default `claude-opus-5-5`,
+or `BBT_AGENT_MODEL`), `--effort low|medium|high|xhigh|max` (default `low`, which
+is quick and cheap; or `BBT_AGENT_EFFORT`), `--max-budget USD`, `--max-turns N`.
+A typical question costs a few cents.
+
+**Regular checks.** For a fixed route and day, a watch (`bbt watch add` / the
+agent's `add_watch`) is the cheap way: cron runs it with no LLM involved. For
+open questions, run the agent from cron with `--notify`. It then works
+unattended and pushes its answer, with the booking link, to your channels:
+
+```cron
+# Mondays 07:50: next weekend's best deal, pushed to ntfy/Telegram
+50 7 * * 1  cd ~/Besser-Bahn/ticket-tool && ANTHROPIC_API_KEY=… uv run --extra agent bbt agent --notify --max-budget 0.5 "Weekend deals Hildesheim ↔ Berlin, next 2 weekends" >> ~/.config/besser-bahn-tickets/agent.log 2>&1
+```
+
+**Tracing with Langfuse.** Set the keys and every run is traced:
+
+```bash
+export LANGFUSE_PUBLIC_KEY=pk-lf-… LANGFUSE_SECRET_KEY=sk-lf-…
+export LANGFUSE_BASE_URL=https://cloud.langfuse.com   # or us.cloud… / self-hosted
+```
+
+Each question becomes one Langfuse trace (`bbt-agent`, tagged `bahncard25`,
+plus `unattended` for `--notify`). It contains the agent turn (model, tokens,
+cost) and one span per tool call with its arguments and the DB result. A chat
+session's turns share a session id. The spans come from
+`openinference-instrumentation-claude-agent-sdk` through Langfuse's
+OpenTelemetry exporter. `BBT_AGENT_TRACE=0` turns tracing off.
 
 ## Notes & limits
 

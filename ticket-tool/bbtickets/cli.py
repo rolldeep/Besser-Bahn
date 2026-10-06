@@ -7,6 +7,7 @@
   bbt check                      # run all watches once (what cron calls)
   bbt cron install --every 10    # add the crontab line
   bbt serve                      # web UI on http://127.0.0.1:8737
+  bbt agent "cheapest Hamburg → Köln next week?"   # Claude agent (BahnCard 25)
   bbt config set notify.ntfy_topic my-secret-topic && bbt notify-test
 """
 from __future__ import annotations
@@ -19,9 +20,9 @@ import shlex
 import subprocess
 import sys
 import webbrowser
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 
-from . import notify, store, watcher
+from . import deals, notify, store, watcher
 from .vendo import BAHNCARDS, BERLIN, Trip, VendoClient, VendoError, berlin
 
 CRON_MARK = "# besser-bahn-ticket-watch"
@@ -92,53 +93,22 @@ def cmd_hunt(a, client, cfg):
     but one Bestpreis-calendar request per day instead of dozens of searches."""
     trip = _trip(client, a, cfg)
     start = date.fromisoformat(a.date) if a.date else date.today()
-    rows = []
-    pool: dict[str, object] = {}  # every priced connection seen, for --top
     print(f"{trip.from_name} → {trip.to_name}", file=sys.stderr)
-    for i in range(a.days):
-        day = start + timedelta(days=i)
-        try:
-            ivs = client.best_prices(trip, day)
-        except VendoError as e:
-            print(f"{day:%a %d.%m.}  error: {e}")
-            continue
-        best = None
-        for iv in ivs:
-            for c in iv["connections"]:
-                dep = c.departure.astimezone(BERLIN) if c.departure else None
-                if not dep or c.price is None:
-                    continue
-                if a.earliest and dep.strftime("%H:%M") < a.earliest:
-                    continue
-                if a.latest and dep.strftime("%H:%M") > a.latest:
-                    continue
-                pool.setdefault(c.key(), c)
-                if best is None or c.price < best.price:
-                    best = c
-            # Intervals may carry only the price, not priced connections.
-            if not iv["connections"] and iv["price"] is not None and not iv["partial"]:
-                frm = iv["from"].astimezone(BERLIN).strftime("%H:%M") if iv["from"] else ""
-                if (not a.earliest or frm >= a.earliest) and (not a.latest or frm <= a.latest):
-                    if best is None or iv["price"] < best.price:
-                        best = _IntervalHit(iv)
-        rows.append((day, best))
-        print(f"{day:%a %d.%m.}  " + (watcher.fmt_conn(best) if best else "—"),
-              flush=True)
-    priced = [(d, b) for d, b in rows if b]
+
+    def show(day, best, err):
+        line = f"error: {err}" if err else (watcher.fmt_conn(best) if best else "—")
+        print(f"{day:%a %d.%m.}  {line}", flush=True)
+
+    rows, pool = deals.cheapest_by_day(client, trip, start, a.days,
+                                       a.earliest, a.latest, on_day=show)
+    priced = [(d, b) for d, b, _ in rows if b]
     if priced:
         d, b = min(priced, key=lambda r: r[1].price)
         print(f"\nCheapest: {d:%a %d.%m.} at €{b.price:.2f}")
     if a.top and pool:
-        top = sorted(pool.values(), key=lambda c: (c.price, c.departure))[:a.top]
+        top = deals.cheapest_overall(pool, a.top)
         print(f"\n{len(top)} cheapest trains across all days:")
         _print_conns(top)
-
-
-class _IntervalHit:
-    """Bestpreis interval without connection detail — enough for a table row."""
-    def __init__(self, iv):
-        self.price, self.departure, self.arrival = iv["price"], iv["from"], iv["to"]
-        self.trains, self.transfers = ["(time slot)"], 0
 
 
 def cmd_watch(a, client, cfg):
@@ -275,6 +245,13 @@ def cmd_serve(a, client, cfg):
     web.serve(client, a.host, a.port, a.watch_every, a.token)
 
 
+def cmd_agent(a, client, cfg):
+    from . import agent
+    from .agent_tools import TicketTools
+    bahncard = None if a.bahncard == "none" else a.bahncard
+    return agent.main(a, TicketTools(client, cfg, bahncard=bahncard))
+
+
 def _route_args(p, watch=False):
     p.add_argument("origin", help="from station (name or HAFAS id)")
     p.add_argument("destination", help="to station")
@@ -363,6 +340,24 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--token", default=os.environ.get("BBT_UI_TOKEN"),
                    help="require ?token=… (set this before using --host 0.0.0.0)")
     p.set_defaults(fn=cmd_serve)
+
+    p = sub.add_parser("agent", help="ask a Claude agent (BahnCard 25 prices)")
+    p.add_argument("prompt", nargs="*",
+                   help="what to find; omit for an interactive chat")
+    p.add_argument("--model", default=os.environ.get("BBT_AGENT_MODEL",
+                                                     "claude-opus-5-5"))
+    p.add_argument("--effort", default=os.environ.get("BBT_AGENT_EFFORT", "low"),
+                   choices=["low", "medium", "high", "xhigh", "max"])
+    p.add_argument("--bahncard", default="bc25",
+                   choices=sorted(BAHNCARDS) + ["none"])
+    p.add_argument("--notify", action="store_true",
+                   help="unattended run: push the answer to your channels")
+    p.add_argument("--max-turns", type=int, default=20)
+    p.add_argument("--max-budget", type=float, metavar="USD",
+                   help="stop the run once it has cost this much")
+    p.add_argument("-v", "--verbose", action="store_true",
+                   help="show tool calls, turns and cost")
+    p.set_defaults(fn=cmd_agent)
     return ap
 
 
@@ -372,10 +367,10 @@ def main(argv=None) -> int:
         raise SystemExit("--every must be 5..59 or a multiple of 60 "
                          "(the DB backend rate-limits aggressive polling)")
     try:
-        a.fn(a, VendoClient(), store.load_config())
+        rc = a.fn(a, VendoClient(), store.load_config())
     except (VendoError, ValueError) as e:  # ValueError: bad date/HH:MM
         print(f"error: {e}", file=sys.stderr)
         return 2
     except KeyboardInterrupt:
         return 130
-    return 0
+    return rc or 0
