@@ -53,5 +53,9 @@ caches (`.playwright-mcp/`), signing keys. They're gitignored — keep them out.
   `bbtickets/vendo.py`; `healthcheck.py`'s `check_ticket_tool` runs that parser
   live. Offline tests: `cd ticket-tool && uv run python -m unittest discover -s tests`
   (or `python3 -m …`). `pyproject.toml` + `uv.lock` back `uv run bbt` / `uv tool install`.
+- `bbt agent` (`bbtickets/agent.py`, extra `[agent]`): Claude Agent SDK agent whose
+  only tools are `bbtickets/agent_tools.py` (plain, SDK-free, tested offline);
+  BahnCard 25 by default; Langfuse tracing via OpenInference when
+  `LANGFUSE_*` keys are set. Fare logic shared with `hunt` lives in `deals.py`.
 - New app structure lives under `flutter-app/lib/screens/`,
   `providers/` (Riverpod), `router/` (GoRouter), `services/`.

@@ -11,6 +11,14 @@ dependencies = [
     "curl_cffi>=0.7",
 ]
 
+[project.optional-dependencies]
+# `bbt agent`: Claude Agent SDK + Langfuse tracing (pip install 'bbtickets[agent]')
+agent = [
+    "claude-agent-sdk>=0.2.159",
+    "langfuse>=4.17",
+    "openinference-instrumentation-claude-agent-sdk>=0.1.20",
+]
+
 [project.scripts]
 bbt = "bbtickets.cli:main"
 
